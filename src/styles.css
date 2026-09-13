@@ -165,6 +165,19 @@ button {
 .pill.lv2 { background: #fff3e0; color: #d35400; }
 .pill.lv3 { background: #fdecea; color: #c0392b; }
 
+/* 클릭 가능한 키워드 태그 */
+.pill-btn {
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.pill-btn:hover {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+}
+
 /* ── Concept detail ──────────────────────────── */
 .back {
   border: none;
