@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CONCEPTS } from '../data/concepts';
 import { QUESTIONS } from '../data/questions';
+import { relatedConcepts } from '../data/relations';
 import { CATEGORIES, categoryMeta } from '../lib/categories';
 import type { Concept } from '../types';
 
@@ -16,12 +17,12 @@ export function ConceptView() {
   const [selected, setSelected] = useState<Concept | null>(null);
   const [tag, setTag] = useState<string | null>(null);
 
-  // 태그 결과 화면 (키워드로 이동)
-  if (tag) {
+  // 키워드 결과 화면
+  if (tag && selected) {
     return (
       <TagResults
         tag={tag}
-        excludeId={selected?.id}
+        origin={selected}
         onSelect={(c) => {
           setSelected(c);
           setTag(null);
@@ -37,6 +38,7 @@ export function ConceptView() {
         concept={selected}
         onBack={() => setSelected(null)}
         onKeyword={(k) => setTag(k)}
+        onSelect={(c) => setSelected(c)}
       />
     );
   }
@@ -87,17 +89,46 @@ function firstLine(body: string): string {
   return line.length > 64 ? line.slice(0, 64) + '…' : line;
 }
 
+/** 연결된 개념 카드 (관계 설명 포함) */
+function ConceptLink({
+  concept,
+  note,
+  onClick,
+}: {
+  concept: Concept;
+  note?: string;
+  onClick: () => void;
+}) {
+  const cat = categoryMeta(concept.category);
+  return (
+    <button
+      className="card cat-card"
+      style={{ ['--cat' as string]: cat.color }}
+      onClick={onClick}
+    >
+      <div className="no">
+        {cat.order}. {cat.label}
+      </div>
+      <div className="name">{concept.title}</div>
+      {note && <div className="relation-note">↔ {note}</div>}
+    </button>
+  );
+}
+
 function ConceptDetail({
   concept,
   onBack,
   onKeyword,
+  onSelect,
 }: {
   concept: Concept;
   onBack: () => void;
   onKeyword: (keyword: string) => void;
+  onSelect: (c: Concept) => void;
 }) {
   const cat = categoryMeta(concept.category);
   const related = QUESTIONS.filter((q) => q.conceptId === concept.id);
+  const links = relatedConcepts(concept.id);
 
   return (
     <>
@@ -120,22 +151,32 @@ function ConceptDetail({
         )}
 
         {concept.keywords && concept.keywords.length > 0 && (
-          <>
-            <div className="muted" style={{ marginTop: 16, marginBottom: 6 }}>
-              키워드를 누르면 연관된 개념을 볼 수 있어요
-            </div>
-            <div className="keywords">
-              {concept.keywords.map((k) => (
-                <button key={k} className="pill pill-btn" onClick={() => onKeyword(k)}>
-                  #{k}
-                </button>
-              ))}
-            </div>
-          </>
+          <div className="keywords">
+            {concept.keywords.map((k) => (
+              <button key={k} className="pill pill-btn" onClick={() => onKeyword(k)}>
+                #{k}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
-      <div className="muted" style={{ marginTop: 14 }}>
+      {/* 연결된 개념 (관계 그래프) */}
+      {links.length > 0 && (
+        <>
+          <div className="section-head" style={{ marginBottom: 10 }}>
+            <h2>🔗 연결된 개념 ({links.length})</h2>
+            <p>이 개념이 다른 개념들과 어떻게 이어지는지 — 눌러서 이동하세요.</p>
+          </div>
+          <div className="grid">
+            {links.map(({ concept: c, note }) => (
+              <ConceptLink key={c.id} concept={c} note={note} onClick={() => onSelect(c)} />
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="muted" style={{ marginTop: 16 }}>
         이 개념과 연결된 문제 {related.length}개 — 「문제 풀이」 탭에서 단원 선택 시 함께 출제됩니다.
       </div>
     </>
@@ -144,16 +185,17 @@ function ConceptDetail({
 
 function TagResults({
   tag,
-  excludeId,
+  origin,
   onSelect,
   onBack,
 }: {
   tag: string;
-  excludeId?: string;
+  origin: Concept;
   onSelect: (c: Concept) => void;
   onBack: () => void;
 }) {
-  const matches = CONCEPTS.filter((c) => c.id !== excludeId && matchesKeyword(c, tag));
+  const matches = CONCEPTS.filter((c) => c.id !== origin.id && matchesKeyword(c, tag));
+  const fallback = matches.length === 0 ? relatedConcepts(origin.id) : [];
 
   return (
     <>
@@ -167,38 +209,37 @@ function TagResults({
           <span className="pill" style={{ fontSize: 14, verticalAlign: 'middle' }}>
             #{tag}
           </span>{' '}
-          연관 개념
+          {matches.length > 0 ? '연관 개념' : '관련 개념'}
         </h2>
-        <p>이 키워드를 다루는 다른 개념 {matches.length}개</p>
+        {matches.length > 0 ? (
+          <p>이 키워드를 다루는 다른 개념 {matches.length}개</p>
+        ) : (
+          <p>
+            이 키워드를 직접 다루는 다른 개념은 없어요. 대신 <b>{origin.title}</b>와(과) 연결된 개념을
+            보여드릴게요.
+          </p>
+        )}
       </div>
 
-      {matches.length === 0 ? (
+      {matches.length > 0 ? (
+        <div className="grid">
+          {matches.map((c) => (
+            <ConceptLink key={c.id} concept={c} onClick={() => onSelect(c)} />
+          ))}
+        </div>
+      ) : fallback.length > 0 ? (
+        <div className="grid">
+          {fallback.map(({ concept: c, note }) => (
+            <ConceptLink key={c.id} concept={c} note={note} onClick={() => onSelect(c)} />
+          ))}
+        </div>
+      ) : (
         <div className="empty">
           <div className="emoji">🔍</div>
-          <p>이 키워드와 연관된 다른 개념이 없어요.</p>
+          <p>연관된 개념을 찾지 못했어요.</p>
           <button className="btn ghost" onClick={onBack}>
             돌아가기
           </button>
-        </div>
-      ) : (
-        <div className="grid">
-          {matches.map((c) => {
-            const cat = categoryMeta(c.category);
-            return (
-              <button
-                key={c.id}
-                className="card cat-card"
-                style={{ ['--cat' as string]: cat.color }}
-                onClick={() => onSelect(c)}
-              >
-                <div className="no">
-                  {cat.order}. {cat.label}
-                </div>
-                <div className="name">{c.title}</div>
-                <div className="desc">{firstLine(c.body)}</div>
-              </button>
-            );
-          })}
         </div>
       )}
     </>
