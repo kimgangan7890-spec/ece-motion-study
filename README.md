@@ -1,5 +1,8 @@
 # 유아동작교육 이론 학습 (ece-motion-study)
 
+🌐 **배포 주소: https://kimgangan7890-spec.github.io/ece-motion-study/**
+(master에 push하면 GitHub Actions로 자동 재배포됩니다.)
+
 대학 유아교육과 **'유아동작 교육'** 과목 이론을 공부하는 학생을 위한 학습앱.
 **개념 학습 → 문제 풀이 → 약점 복습**의 시험 대비 루프를, 서버·카메라·외부 API 없이 브라우저 안에서 돌립니다.
 
